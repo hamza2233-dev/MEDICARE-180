@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ringba URL Enricher Tester (CORS Safe)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-6">
+
+    <div class="w-full max-w-2xl bg-slate-800 rounded-xl shadow-2xl border border-slate-700 p-6">
+        <h2 class="text-2xl font-bold mb-2 text-indigo-400">Ringba Data Enrichment Tester</h2>
+        <p class="text-slate-400 text-sm mb-6">Proxy Mode Active: CORS issues are handled by Vercel Backend.</p>
+
+        <form id="enrichForm" class="space-y-4">
+            <!-- Row 1: Phone and DOB Selectors -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Caller Number</label>
+                    <input type="text" id="caller_number" value="+1234567890" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Date of Birth (Month / Day / Year)</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <!-- Month Dropdown -->
+                        <select id="dob_month" class="bg-slate-950 border border-slate-700 rounded px-2 py-2 text-sm focus:outline-none focus:border-indigo-500 text-slate-300">
+                            <option value="01">Jan (01)</option>
+                            <option value="02">Feb (02)</option>
+                            <option value="03">Mar (03)</option>
+                            <option value="04">Apr (04)</option>
+                            <option value="05">May (05)</option>
+                            <option value="06">Jun (06)</option>
+                            <option value="07">Jul (07)</option>
+                            <option value="08">Aug (08)</option>
+                            <option value="09">Sep (09)</option>
+                            <option value="10">Oct (10)</option>
+                            <option value="11">Nov (11)</option>
+                            <option value="12">Dec (12)</option>
+                        </select>
+                        <!-- Day Dropdown -->
+                        <select id="dob_day" class="bg-slate-950 border border-slate-700 rounded px-2 py-2 text-sm focus:outline-none focus:border-indigo-500 text-slate-300">
+                            <!-- Populated dynamically via JavaScript -->
+                        </select>
+                        <!-- Year Dropdown -->
+                        <select id="dob_year" class="bg-slate-950 border border-slate-700 rounded px-2 py-2 text-sm focus:outline-none focus:border-indigo-500 text-slate-300">
+                            <!-- Populated dynamically via JavaScript -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">First Name</label>
+                    <input type="text" id="first_name" value="John" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Last Name</label>
+                    <input type="text" id="last_name" value="Doe" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <!-- Row 3 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">State</label>
+                    <input type="text" id="state" value="FL" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Zip Code</label>
+                    <input type="text" id="caller_zip" value="33101" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <!-- Method Selection -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">HTTP Request Method</label>
+                <select id="reqMethod" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 text-slate-300">
+                    <option value="GET">GET (Standard Link Append)</option>
+                    <option value="POST">POST (Data Payload)</option>
+                </select>
+            </div>
+
+            <div class="pt-2">
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold py-2.5 px-4 rounded transition cursor-pointer">
+                    Send Test Ping (Via Proxy)
+                </button>
+            </div>
+        </form>
+
+        <hr class="border-slate-700 my-6">
+
+        <div>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Server Response From Ringba</h3>
+            <pre id="responseOutput" class="bg-slate-950 text-slate-300 font-mono text-xs p-4 rounded border border-slate-800 h-40 overflow-y-auto whitespace-pre-wrap">Waiting for request submission...</pre>
+        </div>
+    </div>
+
+    <script>
+        // Setup dropdown fields dynamically for ease of use
+        const daySelect = document.getElementById('dob_day');
+        const yearSelect = document.getElementById('dob_year');
+
+        // Populate days (01 to 31)
+        for (let i = 1; i <= 31; i++) {
+            let val = i < 10 ? '0' + i : i;
+            let opt = document.createElement('option');
+            opt.value = val;
+            opt.innerHTML = val;
+            daySelect.appendChild(opt);
+        }
+
+        // Populate years (Current year down to 1920)
+        const currentYear = new Date().getFullYear();
+        for (let i = currentYear; i >= 1920; i--) {
+            let opt = document.createElement('option');
+            opt.value = i;
+            opt.innerHTML = i;
+            // Default select a realistic standard adult age (e.g., 1960)
+            if(i === 1960) opt.selected = true;
+            yearSelect.appendChild(opt);
+        }
+
+        const form = document.getElementById('enrichForm');
+        const responseOutput = document.getElementById('responseOutput');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const method = document.getElementById('reqMethod').value;
+            
+            responseOutput.innerText = "Routing payload through serverless proxy...";
+            responseOutput.className = "bg-slate-950 text-amber-400 font-mono text-xs p-4 rounded border border-slate-800 h-40 overflow-y-auto whitespace-pre-wrap";
+
+            // Grab split fields and construct MONTH-DATE-YEAR string
+            const mm = document.getElementById('dob_month').value;
+            const dd = document.getElementById('dob_day').value;
+            const yyyy = document.getElementById('dob_year').value;
+            const formattedDob = `${mm}-${dd}-${yyyy}`; // Results in MM-DD-YYYY
+
+            // Prepare layout payload
+            const payload = {
+                caller_number: document.getElementById('caller_number').value,
+                first_name: document.getElementById('first_name').value,
+                last_name: document.getElementById('last_name').value,
+                state: document.getElementById('state').value,
+                caller_zip: document.getElementById('caller_zip').value,
+                caller_dob: formattedDob // Sent formatted perfectly
+            };
+
+            try {
+                let targetUrl = '/api/ping';
+                const options = { method: method };
+
+                if (method === 'GET') {
+                    const params = new URLSearchParams(payload);
+                    targetUrl += `?${params.toString()}`;
+                } else {
+                    options.headers = { 'Content-Type': 'application/json' };
+                    options.body = JSON.stringify(payload);
+                }
+
+                const res = await fetch(targetUrl, options);
+                const textData = await res.text();
+                
+                responseOutput.className = "bg-slate-950 text-emerald-400 font-mono text-xs p-4 rounded border border-slate-800 h-40 overflow-y-auto whitespace-pre-wrap";
+                
+                try {
+                    const jsonData = JSON.parse(textData);
+                    responseOutput.innerText = JSON.stringify(jsonData, null, 2);
+                } catch {
+                    responseOutput.innerText = `[Status ${res.status}] ${textData || 'Success (No payload returned)'}`;
+                }
+
+            } catch (err) {
+                responseOutput.className = "bg-slate-950 text-rose-400 font-mono text-xs p-4 rounded border border-slate-800 h-40 overflow-y-auto whitespace-pre-wrap";
+                responseOutput.innerText = `Error: ${err.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
