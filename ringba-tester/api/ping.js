@@ -1,35 +1,63 @@
 export default async function handler(req, res) {
-    // Add CORS headers so your frontend can communicate with this serverless backend
+    // Enable CORS headers
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    // Handle browser pre-flight OPTIONS request
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
     try {
-        const baseUrl = "https://display.ringba.com/enrich/2861133262468678687";
+        // Core Ringba Endpoint ID
+        const targetUrl = "https://display.ringba.com/enrich/2861133262468678687";
         
-        // Grab incoming data from either GET (query) or POST (body)
-        const data = req.method === 'POST' ? req.body : req.query;
+        // Extract incoming data from request
+        const incomingData = req.method === 'POST' ? req.body : req.query;
 
-        // Construct the target Ringba URL with query parameters
-        const params = new URLSearchParams(data);
-        const targetUrl = `${baseUrl}?${params.toString()}`;
+        // Clean up phone number (Remove spaces, dashes, parentheses, and leading +)
+        let cleanNumber = incomingData.caller_number ? incomingData.caller_number.replace(/\D/g, '') : '';
+        
+        // Ensure standard US country code format (Add '1' if it's exactly 10 digits)
+        if (cleanNumber.length === 10) {
+            cleanNumber = '1' + cleanNumber;
+        }
 
-        // Forward the request from Vercel's backend server to Ringba
-        const ringbaResponse = await fetch(targetUrl, {
-            method: req.method,
-            headers: req.method === 'POST' ? { 'Content-Type': 'application/json' } : {},
-            body: req.method === 'POST' ? JSON.stringify(data) : undefined
-        });
+        // Map the payload keys cleanly for Ringba's query expectations
+        const cleanPayload = {
+            caller_number: cleanNumber,
+            first_name: incomingData.first_name || '',
+            last_name: incomingData.last_name || '',
+            state: incomingData.state || '',
+            caller_zip: incomingData.caller_zip || '',
+            caller_dob: incomingData.caller_dob || ''
+        };
+
+        let ringbaResponse;
+
+        if (req.method === 'POST') {
+            // Convert JSON object to standard Form URL Encoded format: key=value&key2=value2
+            const formBody = new URLSearchParams(cleanPayload).toString();
+
+            ringbaResponse = await fetch(targetUrl, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/x-www-form-urlencoded' 
+                },
+                body: formBody
+            });
+        } else {
+            // If GET request, append parameters directly
+            const queryParams = new URLSearchParams(cleanPayload).toString();
+            ringbaResponse = await fetch(`${targetUrl}?${queryParams}`, {
+                method: 'GET'
+            });
+        }
 
         const textResponse = await ringbaResponse.text();
         
-        // Return Ringba's answer back to your frontend
+        // Send Ringba's response back to the frontend form
         return res.status(ringbaResponse.status).send(textResponse);
 
     } catch (error) {
